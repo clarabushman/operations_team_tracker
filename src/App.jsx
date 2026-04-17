@@ -32,6 +32,7 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 
 const isTrue = (val) => String(val).toUpperCase() === 'TRUE';
 const getAddress = (r) => `${r.postal_number || ''} ${r.street_name || ''}`.trim();
+const isZeroBills = (tariff) => String(tariff || '').toLowerCase().includes('zero');
 
 const isSmartTeam = (team) => {
   const t = String(team).toUpperCase();
@@ -80,6 +81,8 @@ export default function App() {
   // Global Portfolio Filters
   const [selectedSites, setSelectedSites] = useState(new Set());
   const [accountSearch, setAccountSearch] = useState('');
+  const [tariffStatusFilter, setTariffStatusFilter] = useState('Both'); // 'Both', 'On Tariff', 'Not on Tariff'
+  
   const [siteOpen, setSiteOpen] = useState(false);
   const siteRef = useRef(null);
 
@@ -94,8 +97,8 @@ export default function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('/data.csv');
-        if (!response.ok) throw new Error("Missing data.csv in public folder.");
+        const response = await fetch('/actuals_operations (1).csv');
+        if (!response.ok) throw new Error("Missing actuals_operations (1).csv in public folder.");
         const text = await response.text();
         const rows = parseCSV(text);
         const rawHeaders = rows[0].map(h => h?.trim());
@@ -116,9 +119,17 @@ export default function App() {
     return data.filter(row => {
       const matchSite = selectedSites.size === 0 || selectedSites.has(row.site_name);
       const matchAcc = !accountSearch || String(row.latest_account_number_for_address || '').toLowerCase().includes(accountSearch.toLowerCase());
-      return matchSite && matchAcc;
+      
+      let matchTariffStatus = true;
+      if (tariffStatusFilter === 'On Tariff') {
+        matchTariffStatus = isZeroBills(row.import_tariff);
+      } else if (tariffStatusFilter === 'Not on Tariff') {
+        matchTariffStatus = !isZeroBills(row.import_tariff);
+      }
+
+      return matchSite && matchAcc && matchTariffStatus;
     });
-  }, [data, selectedSites, accountSearch]);
+  }, [data, selectedSites, accountSearch, tariffStatusFilter]);
 
   const filterOptions = useMemo(() => {
     const sites = [...new Set(data.map(r => r.site_name))].filter(Boolean).sort();
@@ -127,7 +138,6 @@ export default function App() {
 
   // --- Metrics Calculations ---
   const metrics = useMemo(() => {
-    // Breakdown logic variables
     const tariffCounts = {};
     const typeCounts = {};
     const tariffMismatches = [];
@@ -142,16 +152,19 @@ export default function App() {
     const missingSmartReads = [];
 
     filteredData.forEach(r => {
-      // 1. Overview counts
+      // 1. Overview counts (Attached accounts for modal click)
       const t = r.import_tariff || 'Unknown Tariff';
-      tariffCounts[t] = (tariffCounts[t] || 0) + 1;
+      if (!tariffCounts[t]) tariffCounts[t] = { name: t, value: 0, accounts: [] };
+      tariffCounts[t].value++;
+      tariffCounts[t].accounts.push(r);
 
       const at = r.account_type || 'Unknown Type';
-      typeCounts[at] = (typeCounts[at] || 0) + 1;
+      if (!typeCounts[at]) typeCounts[at] = { name: at, value: 0, accounts: [] };
+      typeCounts[at].value++;
+      typeCounts[at].accounts.push(r);
 
       // 2. Tariff Date Mismatches
       const checkMismatch = (d1, d2) => d1 && d2 && String(d1).trim().toLowerCase() !== 'null' && String(d2).trim().toLowerCase() !== 'null' && d1 !== d2;
-      
       const hasMismatch = checkMismatch(r.kraken_import_tariff_valid_from, r.agreement_valid_from) ||
                           checkMismatch(r.kraken_import_tariff_valid_to, r.agreement_valid_to) ||
                           checkMismatch(r.kraken_export_tariff_valid_from, r.agreement_valid_from) ||
@@ -204,7 +217,6 @@ export default function App() {
       // 7. Missing Smart Reads
       const impHasMpan = hasValidMpan(r.import_mpan);
       const expHasMpan = hasValidMpan(r.export_mpan);
-      
       const impStale = impHasMpan && isDateStale(r.import_last_smart_read_date);
       const expStale = expHasMpan && isDateStale(r.export_last_smart_read_date);
 
@@ -214,8 +226,8 @@ export default function App() {
     });
 
     return {
-      tariffData: Object.entries(tariffCounts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value),
-      typeData: Object.entries(typeCounts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value),
+      tariffData: Object.values(tariffCounts).sort((a,b) => b.value - a.value),
+      typeData: Object.values(typeCounts).sort((a,b) => b.value - a.value),
       tariffMismatches,
       opsTeamBreakdown: Object.values(opsTeamBreakdown).sort((a,b) => b.total - a.total),
       nonSmartAccounts,
@@ -303,7 +315,9 @@ export default function App() {
                   <th className="p-3 hover:bg-slate-200" onClick={() => handleSort('site_name')}>Site <SortIcon colKey="site_name"/></th>
                   <th className="p-3 hover:bg-slate-200" onClick={() => handleSort('account_type')}>Type <SortIcon colKey="account_type"/></th>
                   <th className="p-3 hover:bg-slate-200" onClick={() => handleSort('import_tariff')}>Import Tariff <SortIcon colKey="import_tariff"/></th>
+                  <th className="p-3 hover:bg-slate-200" onClick={() => handleSort('export_tariff')}>Export Tariff <SortIcon colKey="export_tariff"/></th>
                   <th className="p-3 hover:bg-slate-200" onClick={() => handleSort('operations_team')}>Ops Team <SortIcon colKey="operations_team"/></th>
+                  <th className="p-3 hover:bg-slate-200 text-center" onClick={() => handleSort('is_psr')}>PSR <SortIcon colKey="is_psr"/></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 flex-1">
@@ -314,8 +328,10 @@ export default function App() {
                     <td className="p-3">{row.postcode}</td>
                     <td className="p-3 font-medium">{row.site_name}</td>
                     <td className="p-3 capitalize">{row.account_type}</td>
-                    <td className="p-3 max-w-[200px] truncate" title={row.import_tariff}>{row.import_tariff}</td>
+                    <td className="p-3 max-w-[150px] truncate" title={row.import_tariff}>{row.import_tariff}</td>
+                    <td className="p-3 max-w-[150px] truncate" title={row.export_tariff}>{row.export_tariff}</td>
                     <td className="p-3 font-semibold text-indigo-700">{row.operations_team}</td>
+                    <td className="p-3 text-center">{isTrue(row.is_psr) ? '✅' : '⬜'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -349,9 +365,19 @@ export default function App() {
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
               <input 
                   type="text" placeholder="Search by Account..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)}
-                  className="w-56 pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  className="w-48 pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition"
               />
             </div>
+
+            <select 
+              value={tariffStatusFilter} 
+              onChange={e => setTariffStatusFilter(e.target.value)}
+              className="px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="Both">Tariff Status: Both</option>
+              <option value="On Tariff">On Tariff (Zero Bills)</option>
+              <option value="Not on Tariff">Not on Tariff (Standard)</option>
+            </select>
 
             <div className="relative" ref={siteRef}>
               <button onClick={() => setSiteOpen(!siteOpen)} className="px-4 py-2 text-sm border border-slate-300 rounded-lg bg-white flex items-center gap-2 hover:bg-slate-50">
@@ -401,12 +427,14 @@ export default function App() {
               {/* Tariff Breakdown Chart */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-[400px]">
                 <h3 className="text-slate-800 font-bold mb-2 flex items-center gap-2"><Zap className="text-amber-500"/> Account Breakdown by Tariff</h3>
-                <div className="flex-1 w-full relative">
+                <p className="text-xs text-slate-500 text-center">Click a chart slice to view the full account list</p>
+                <div className="flex-1 w-full relative cursor-pointer">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie 
                                 data={metrics.tariffData} 
                                 cx="50%" cy="50%" innerRadius={70} outerRadius={110} paddingAngle={2} dataKey="value"
+                                onClick={(entry) => handleDrillDown(`Tariff: ${entry.name}`, entry.accounts)}
                                 label={({ payload, cx, x, y, textAnchor }) => (
                                     <text x={x} y={y} cx={cx} textAnchor={textAnchor} dominantBaseline="central" className="text-xs font-semibold fill-slate-700">
                                         {payload.value}
@@ -414,7 +442,7 @@ export default function App() {
                                 )}
                             >
                                 {metrics.tariffData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition" />
                                 ))}
                             </Pie>
                             <RechartsTooltip formatter={(value, name) => [`${value} Accounts`, name]} />
@@ -427,12 +455,14 @@ export default function App() {
               {/* Developer vs Customer Chart */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-[400px]">
                 <h3 className="text-slate-800 font-bold mb-2 flex items-center gap-2"><User className="text-indigo-500"/> Developer vs. Customer Accounts</h3>
-                <div className="flex-1 w-full relative">
+                <p className="text-xs text-slate-500 text-center">Click a chart slice to view the full account list</p>
+                <div className="flex-1 w-full relative cursor-pointer">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie 
                                 data={metrics.typeData} 
                                 cx="50%" cy="50%" innerRadius={70} outerRadius={110} paddingAngle={2} dataKey="value"
+                                onClick={(entry) => handleDrillDown(`Type: ${entry.name}`, entry.accounts)}
                                 label={({ payload, cx, x, y, textAnchor }) => (
                                     <text x={x} y={y} cx={cx} textAnchor={textAnchor} dominantBaseline="central" className="text-xs font-semibold fill-slate-700">
                                         {payload.value}
@@ -440,7 +470,7 @@ export default function App() {
                                 )}
                             >
                                 {metrics.typeData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={['#8b5cf6', '#14b8a6'][index % 2]} />
+                                    <Cell key={`cell-${index}`} fill={['#8b5cf6', '#14b8a6'][index % 2]} className="hover:opacity-80 transition" />
                                 ))}
                             </Pie>
                             <RechartsTooltip formatter={(value, name) => [`${value} Accounts`, name]} />
