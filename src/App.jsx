@@ -97,8 +97,8 @@ export default function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('/data.csv');
-        if (!response.ok) throw new Error("Missing data.csv in public folder.");
+        const response = await fetch('/actuals_operations (1).csv');
+        if (!response.ok) throw new Error("Missing actuals_operations (1).csv in public folder.");
         const text = await response.text();
         const rows = parseCSV(text);
         const rawHeaders = rows[0].map(h => h?.trim());
@@ -321,19 +321,35 @@ export default function App() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 flex-1">
-                {processedModalData.map((row, i) => (
-                  <tr key={i} className="hover:bg-slate-50">
-                    <td className="p-3 font-medium text-slate-900">{row.latest_account_number_for_address || row.import_mpan}</td>
-                    <td className="p-3">{getAddress(row)}</td>
-                    <td className="p-3">{row.postcode}</td>
-                    <td className="p-3 font-medium">{row.site_name}</td>
-                    <td className="p-3 capitalize">{row.account_type}</td>
-                    <td className="p-3 max-w-[150px] truncate" title={row.import_tariff}>{row.import_tariff}</td>
-                    <td className="p-3 max-w-[150px] truncate" title={row.export_tariff}>{row.export_tariff}</td>
-                    <td className="p-3 font-semibold text-indigo-700">{row.operations_team}</td>
-                    <td className="p-3 text-center">{isTrue(row.is_psr) ? '✅' : '⬜'}</td>
-                  </tr>
-                ))}
+                {processedModalData.map((row, i) => {
+                  const isDev = String(row.account_type).toLowerCase() === 'developer';
+                  const hasZeroBillsImp = isZeroBills(row.import_tariff);
+                  const hasZeroBillsExp = isZeroBills(row.export_tariff);
+
+                  return (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="p-3 font-medium text-slate-900">{row.latest_account_number_for_address || row.import_mpan}</td>
+                      <td className="p-3">{getAddress(row)}</td>
+                      <td className="p-3">{row.postcode}</td>
+                      <td className="p-3 font-medium">{row.site_name}</td>
+                      <td className="p-3 capitalize">{row.account_type}</td>
+                      <td className="p-3 max-w-[200px] truncate" title={row.import_tariff}>
+                        {row.import_tariff}
+                        {isDev && hasZeroBillsImp && (
+                           <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded border border-red-200" title="Developers should not be on a Zero Bills tariff">Flagged</span>
+                        )}
+                      </td>
+                      <td className="p-3 max-w-[200px] truncate" title={row.export_tariff}>
+                        {row.export_tariff}
+                        {isDev && hasZeroBillsExp && (
+                           <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded border border-red-200" title="Developers should not be on a Zero Bills tariff">Flagged</span>
+                        )}
+                      </td>
+                      <td className="p-3 font-semibold text-indigo-700">{row.operations_team}</td>
+                      <td className="p-3 text-center">{isTrue(row.is_psr) ? '✅' : '⬜'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {processedModalData.length === 0 && <p className="text-center text-slate-500 py-8">No records match your search.</p>}
