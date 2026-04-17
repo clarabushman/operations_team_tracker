@@ -669,7 +669,7 @@ export default function App() {
                 <span className="text-[10px] font-semibold text-indigo-500 mt-1">{(metrics.battSetup.length / metrics.totalBattery * 100 || 0).toFixed(1)}% of total</span>
               </div>
               <div onClick={() => handleDrillDown('Batteries Online', metrics.battOnline)} className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm flex flex-col justify-center items-center cursor-pointer hover:bg-emerald-50 text-center">
-                <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">Online (Signal OK)</span>
+                <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">Online</span>
                 <span className="text-2xl font-black text-emerald-700">{metrics.battOnline.length}</span>
                 <div className="text-[10px] font-semibold text-emerald-600 mt-1 leading-tight">
                     {(metrics.battOnline.length / metrics.battSetup.length * 100 || 0).toFixed(1)}% of setup<br/>
