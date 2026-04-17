@@ -94,8 +94,8 @@ export default function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('/public/data.csv');
-        if (!response.ok) throw new Error("Missing public/data.csv in public folder.");
+        const response = await fetch('/data.csv');
+        if (!response.ok) throw new Error("Missing data.csv in public folder.");
         const text = await response.text();
         const rows = parseCSV(text);
         const rawHeaders = rows[0].map(h => h?.trim());
