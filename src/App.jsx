@@ -333,16 +333,16 @@ export default function App() {
                       <td className="p-3">{row.postcode}</td>
                       <td className="p-3 font-medium">{row.site_name}</td>
                       <td className="p-3 capitalize">{row.account_type}</td>
-                      <td className="p-3 max-w-[200px] truncate" title={row.import_tariff}>
+                      <td className={`p-3 max-w-[200px] truncate ${isDev && hasZeroBillsImp ? 'bg-red-50 text-red-700 font-bold' : ''}`} title={row.import_tariff}>
                         {row.import_tariff}
                         {isDev && hasZeroBillsImp && (
-                           <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded border border-red-200" title="Developers should not be on a Zero Bills tariff">Flagged</span>
+                           <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded border border-red-300" title="Developers should not be on a Zero Bills tariff">Flagged</span>
                         )}
                       </td>
-                      <td className="p-3 max-w-[200px] truncate" title={row.export_tariff}>
+                      <td className={`p-3 max-w-[200px] truncate ${isDev && hasZeroBillsExp ? 'bg-red-50 text-red-700 font-bold' : ''}`} title={row.export_tariff}>
                         {row.export_tariff}
                         {isDev && hasZeroBillsExp && (
-                           <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded border border-red-200" title="Developers should not be on a Zero Bills tariff">Flagged</span>
+                           <span className="ml-2 inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded border border-red-300" title="Developers should not be on a Zero Bills tariff">Flagged</span>
                         )}
                       </td>
                       <td className="p-3 font-semibold text-indigo-700">{row.operations_team}</td>
