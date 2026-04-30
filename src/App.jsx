@@ -27,6 +27,36 @@ const parseCSV = (str) => {
   return arr;
 };
 
+// CSV Export Utility
+const exportToCSV = (dataList, filename) => {
+  if (!dataList || !dataList.length) return;
+  const headers = Object.keys(dataList[0]);
+  const csvRows = [];
+  
+  // Push headers
+  csvRows.push(headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','));
+  
+  // Push rows
+  for (const row of dataList) {
+    csvRows.push(headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(','));
+  }
+  
+  const csvString = csvRows.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  // Clean filename of any weird characters
+  const safeFilename = filename.replace(/[^a-z0-9 -]/gi, '').trim();
+  link.setAttribute('download', `${safeFilename}.csv`);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 // Colors for charts
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'];
 
@@ -97,8 +127,8 @@ export default function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('/data.csv');
-        if (!response.ok) throw new Error("Missing data.csv in public folder.");
+        const response = await fetch('/actuals_operations (1).csv');
+        if (!response.ok) throw new Error("Missing actuals_operations (1).csv in public folder.");
         const text = await response.text();
         const rows = parseCSV(text);
         const rawHeaders = rows[0].map(h => h?.trim());
@@ -290,19 +320,29 @@ export default function App() {
     return (
       <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] max-h-[90vh] flex flex-col">
-          <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
+          <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl gap-4 flex-wrap">
             <div>
               <h2 className="text-xl font-bold text-slate-800">{drillDownTitle} <span className="text-slate-500 text-sm font-normal">({processedModalData.length} records)</span></h2>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => exportToCSV(processedModalData, drillDownTitle)} 
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition shadow-sm"
+              >
+                <Download size={16}/> Export CSV
+              </button>
+              
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
                 <input 
                   type="text" placeholder="Search rows..." value={modalSearch} onChange={e => setModalSearch(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 w-64"
+                  className="pl-9 pr-4 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 w-64 outline-none"
                 />
               </div>
-              <button onClick={() => setDrillDownData(null)} className="p-2 hover:bg-slate-200 rounded-full transition"><X size={20}/></button>
+              
+              <button onClick={() => setDrillDownData(null)} className="p-1.5 hover:bg-slate-200 rounded-full transition text-slate-500 hover:text-slate-800">
+                <X size={20}/>
+              </button>
             </div>
           </div>
           <div className="overflow-auto p-4 flex-1">
@@ -669,7 +709,7 @@ export default function App() {
                 <span className="text-[10px] font-semibold text-indigo-500 mt-1">{(metrics.battSetup.length / metrics.totalBattery * 100 || 0).toFixed(1)}% of total</span>
               </div>
               <div onClick={() => handleDrillDown('Batteries Online', metrics.battOnline)} className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm flex flex-col justify-center items-center cursor-pointer hover:bg-emerald-50 text-center">
-                <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">Online</span>
+                <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">Online (Signal OK)</span>
                 <span className="text-2xl font-black text-emerald-700">{metrics.battOnline.length}</span>
                 <div className="text-[10px] font-semibold text-emerald-600 mt-1 leading-tight">
                     {(metrics.battOnline.length / metrics.battSetup.length * 100 || 0).toFixed(1)}% of setup<br/>
